@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 // GET: Fetch a single class with its academic year
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
@@ -27,7 +27,7 @@ export async function GET(
 // PATCH: Update a class
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
@@ -54,7 +54,7 @@ export async function PATCH(
 // DELETE: Remove a class
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;

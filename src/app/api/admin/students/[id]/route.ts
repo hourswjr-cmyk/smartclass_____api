@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase';
 // GET: Get a single student by ID
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const { data, error } = await supabase
       .from('students')
@@ -115,10 +115,10 @@ export async function PATCH(
 // DELETE: Remove student and their user account
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // 1. Get user_id first
     const { data: student, error: fetchError } = await supabase
