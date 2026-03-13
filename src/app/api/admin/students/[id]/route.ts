@@ -112,7 +112,7 @@ export async function PATCH(
   }
 }
 
-// DELETE: Remove student and their user account
+// DELETE: Remove student and their user account with cascading cleanup
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -128,13 +128,39 @@ export async function DELETE(
       .single();
 
     if (fetchError || !student) {
-      // If student not found, it might already be deleted
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
     const userId = student.user_id;
 
-    // 2. Delete from students table
+    // 2. Cascading cleanup of related records
+    // We do this in order of child tables to avoid FK violations
+    
+    // Cleanup Student Parents relationship
+    await supabase.from('student_parents').delete().eq('student_id', id);
+    
+    // Cleanup Enrollments
+    await supabase.from('student_enrollments').delete().eq('student_id', id);
+    
+    // Cleanup Academic History
+    await supabase.from('attendance').delete().eq('student_id', id);
+    await supabase.from('grade_entries').delete().eq('student_id', id);
+    await supabase.from('assignment_submissions').delete().eq('student_id', id);
+    
+    // Cleanup Financial History
+    // First find related student fees to clean up payments if any (though fee_payments uses student_fee_id)
+    const { data: fees } = await supabase.from('student_fees').select('id').eq('student_id', id);
+    if (fees && fees.length > 0) {
+      const feeIds = fees.map(f => f.id);
+      await supabase.from('fee_payments').delete().in('student_fee_id', feeIds);
+    }
+    await supabase.from('student_fees').delete().eq('student_id', id);
+    await supabase.from('invoices').delete().eq('student_id', id);
+    
+    // Cleanup Logs
+    await supabase.from('activity_logs').delete().eq('student_id', id);
+
+    // 3. Delete from students table
     const { error: studentDeleteError } = await supabase
       .from('students')
       .delete()
@@ -144,7 +170,7 @@ export async function DELETE(
       return NextResponse.json({ error: studentDeleteError.message }, { status: 400 });
     }
 
-    // 3. Delete from users table
+    // 4. Delete from users table
     if (userId) {
       const { error: userDeleteError } = await supabase
         .from('users')
@@ -153,13 +179,13 @@ export async function DELETE(
 
       if (userDeleteError) {
         return NextResponse.json({ 
-          message: 'Student record deleted, but failed to delete user account',
+          message: 'Student record and history deleted, but failed to delete user account',
           error: userDeleteError.message 
         }, { status: 400 });
       }
     }
 
-    return NextResponse.json({ message: 'Student and user account deleted successfully' });
+    return NextResponse.json({ message: 'Student, historical records, and user account deleted successfully' });
   } catch (error: any) {
     console.error('Student deletion error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

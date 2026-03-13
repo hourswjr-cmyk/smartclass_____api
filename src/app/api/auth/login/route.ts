@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { SignJWT } from 'jose';
 import { fetchUserProfile } from '@/lib/auth-utils';
 
+export const dynamic = 'force-dynamic';
+
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'fallback_secret_to_be_replaced_in_env'
 );

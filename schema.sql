@@ -252,7 +252,6 @@ CREATE TABLE public.teachers (
   user_id bigint NOT NULL UNIQUE,
   employee_code character varying NOT NULL UNIQUE,
   full_name character varying NOT NULL,
-  qualification character varying,
   department character varying,
   joining_date date,
   is_class_teacher boolean DEFAULT false,

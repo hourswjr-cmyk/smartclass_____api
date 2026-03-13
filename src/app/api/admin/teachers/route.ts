@@ -3,11 +3,11 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// GET: List all students with their user details
+// GET: List all teachers with their user details
 export async function GET() {
   try {
     const { data, error } = await supabase
-      .from('students')
+      .from('teachers')
       .select(`
         *,
         users!inner (
@@ -19,18 +19,20 @@ export async function GET() {
         )
       `)
       .order('created_at', { ascending: false });
+
     if (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error fetching teachers:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error('Students fetch error:', error);
+    console.error('Teachers fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// POST: Create a new student (from create-student)
+// POST: Create a new teacher
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -39,6 +41,8 @@ export async function POST(request: Request) {
       password,
       full_name,
       phone,
+      department,
+      joining_date
     } = body;
 
     // 1. Validation
@@ -49,13 +53,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Auto-generate Student Code
-    // Format: STU-YYYY-RANDOM (e.g. STU-2026-1234)
+    // 2. Auto-generate Employee Code
+    // Format: EMP-YYYY-RANDOM (e.g. EMP-2026-1234)
     const year = new Date().getFullYear();
     const random = Math.floor(1000 + Math.random() * 9000); // 4 digit random
-    const student_code = `STU-${year}-${random}`;
+    const employee_code = `EMP-${year}-${random}`;
 
-    // 4. Insert into public.users
+    // 3. Insert into public.users
     const { data: user, error: userError } = await supabase
       .from('users')
       .insert([
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
           phone, 
           full_name, 
           password, 
-          role: 'student',
+          role: 'teacher',
           is_active: true
         }
       ])
@@ -72,54 +76,62 @@ export async function POST(request: Request) {
       .single();
 
     if (userError) {
-      console.error('User creation error:', userError);
+      console.error('User creation error for teacher:', userError);
       return NextResponse.json(
-        { error: userError.message || 'Failed to create user' },
+        { error: userError.message || 'Failed to create user account' },
         { status: 400 }
       );
     }
 
     const userId = user.id;
 
-    // 5. Insert into public.students
-    const { data: student, error: studentError } = await supabase
-      .from('students')
+    // 4. Insert into public.teachers
+    const { data: teacher, error: teacherError } = await supabase
+      .from('teachers')
       .insert([
         {
           user_id: userId,
-          student_code,
+          employee_code,
           full_name,
-          enrollment_date: new Date().toISOString().split('T')[0],
-          status: 'active'
+          department,
+          joining_date: joining_date || new Date().toISOString().split('T')[0],
+          is_class_teacher: false
         }
       ])
       .select('*')
       .single();
 
-    if (studentError) {
-      console.error('Student profile creation error:', studentError);
-      // Clean up user if student profile fails
+    if (teacherError) {
+      console.error('Teacher profile creation error:', teacherError);
+      
+      // Clean up user if teacher profile fails (simulated transaction)
       await supabase.from('users').delete().eq('id', userId);
       
       return NextResponse.json(
-        { error: 'User created but failed to create student profile' },
+        { 
+            error: 'User created but failed to create teacher profile',
+            details: teacherError.message,
+            hint: teacherError.hint,
+            details_obj: teacherError
+        },
         { status: 500 }
       );
     }
 
-    // 6. Return Success with student info
+    // 5. Return Success with teacher info
     return NextResponse.json({
-      ...student,
+      ...teacher,
       users: {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: user.role
+        role: user.role,
+        is_active: user.is_active
       }
     }, { status: 201 });
 
   } catch (error: any) {
-    console.error('Admin student creation error:', error);
+    console.error('Admin teacher creation error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
